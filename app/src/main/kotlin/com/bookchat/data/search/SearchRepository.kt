@@ -5,7 +5,9 @@ import com.bookchat.data.stats.BotStatsRepository
 import com.bookchat.irc.IrcRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +42,8 @@ class SearchRepository @Inject constructor(
     private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
 
+    private var searchTimeoutJob: Job? = null
+
     init {
         scope.launch {
             ircRepository.dccOffers.collect { offer ->
@@ -59,6 +63,13 @@ class SearchRepository @Inject constructor(
         settingsRepository.addRecentSearch(query)
         val channel = settingsRepository.settings.first().ircChannel
         ircRepository.sendRaw("PRIVMSG $channel :@search $query")
+        searchTimeoutJob?.cancel()
+        searchTimeoutJob = scope.launch {
+            delay(30_000)
+            if (_searchState.value is SearchUiState.Searching) {
+                _searchState.value = SearchUiState.Error("No response from search bot")
+            }
+        }
     }
 
     fun updateResultState(fileName: String, state: DownloadState) {
@@ -68,6 +79,7 @@ class SearchRepository @Inject constructor(
     }
 
     private suspend fun receiveSearchZip(offer: com.bookchat.irc.DccOffer) {
+        searchTimeoutJob?.cancel()
         val bytes = withContext(Dispatchers.IO) {
             runCatching {
                 val socket = Socket()
