@@ -48,17 +48,7 @@ class DownloadRepository @Inject constructor(
 
     private var downloadJob: Job? = null
 
-    // Populated from DataStore on first emission; guaranteed non-default before any download uses it
-    @Volatile private var cachedSettings = com.bookchat.data.settings.AppSettings()
-    @Volatile private var settingsReady = false
-
     init {
-        scope.launch {
-            settingsRepository.settings.collect {
-                cachedSettings = it
-                settingsReady = true
-            }
-        }
         scope.launch {
             ircRepository.dccOffers.collect { offer ->
                 val active = _activeDownload.value
@@ -74,7 +64,7 @@ class DownloadRepository @Inject constructor(
     fun enqueue(item: DownloadItem) {
         _queue.value = _queue.value + item
         startServiceIfNeeded()
-        if (_activeDownload.value == null) processNext(cachedSettings.ircChannel)
+        if (_activeDownload.value == null) scope.launch { processNext() }
     }
 
     fun cancelActive() {
@@ -83,7 +73,7 @@ class DownloadRepository @Inject constructor(
         moveToCompleted(active.copy(state = DownloadItemState.Cancelled))
         searchRepository.updateResultState(active.expectedFileName, DownloadState.Idle)
         _activeDownload.value = null
-        processNext()
+        scope.launch { processNext() }
     }
 
     fun removeFromQueue(id: UUID) {
@@ -95,11 +85,12 @@ class DownloadRepository @Inject constructor(
         enqueue(item.copy(id = UUID.randomUUID(), state = DownloadItemState.Queued))
     }
 
-    private fun processNext(channel: String = cachedSettings.ircChannel) {
+    private suspend fun processNext() {
         val next = _queue.value.firstOrNull() ?: run {
             stopService()
             return
         }
+        val channel = settingsRepository.settings.first().ircChannel
         _queue.value = _queue.value.drop(1)
         _activeDownload.value = next.copy(state = DownloadItemState.RequestSent)
         ircRepository.sendRaw("PRIVMSG $channel :${next.botName}")
