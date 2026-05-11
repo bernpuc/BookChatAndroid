@@ -94,7 +94,9 @@ class IrcClient {
             while (!sock.isClosed) {
                 val raw = reader.readLine() ?: break
                 if (firstLine) {
-                    sock.soTimeout = 0  // SSL handshake done, switch to blocking reads
+                    // 5-minute read timeout — detects silently stale connections faster
+                    // than the OS TCP keepalive (default ~2 h on Android).
+                    sock.soTimeout = 300_000
                     firstLine = false
                 }
                 val line = raw.trimEnd()

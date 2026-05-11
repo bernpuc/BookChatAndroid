@@ -87,12 +87,14 @@ class DownloadRepository @Inject constructor(
 
     private suspend fun processNext() {
         val next = _queue.value.firstOrNull() ?: run {
+            ircRepository.setDownloadActive(false)
             stopService()
             return
         }
         val channel = settingsRepository.settings.first().ircChannel
         _queue.value = _queue.value.drop(1)
         _activeDownload.value = next.copy(state = DownloadItemState.RequestSent)
+        ircRepository.setDownloadActive(true)
         ircRepository.sendRaw("PRIVMSG $channel :${next.downloadCommand}")
         searchRepository.updateResultState(next.expectedFileName, DownloadState.Requesting)
     }

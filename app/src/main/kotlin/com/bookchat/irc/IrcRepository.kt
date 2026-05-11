@@ -1,5 +1,10 @@
 package com.bookchat.irc
 
+import android.os.Handler
+import android.os.Looper
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.bookchat.data.settings.AppSettings
 import com.bookchat.data.settings.SettingsRepository
 import com.bookchat.ui.common.UserEventBus
@@ -10,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +41,10 @@ class IrcRepository @Inject constructor(
     private var connectJob: Job? = null
     private var everConnected = false
 
+    @Volatile private var isForegrounded = true
+    @Volatile private var lifecyclePaused = false
+    @Volatile private var hasActiveDownload = false
+
     init {
         scope.launch {
             settingsRepository.settings
@@ -53,6 +63,45 @@ class IrcRepository @Inject constructor(
                 }
             }
         }
+        // addObserver must be called on the main thread
+        Handler(Looper.getMainLooper()).post {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(
+                LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_STOP -> {
+                            isForegrounded = false
+                            if (!hasActiveDownload) pauseForLifecycle()
+                        }
+                        Lifecycle.Event.ON_START -> {
+                            isForegrounded = true
+                            if (lifecyclePaused) resumeFromLifecycle()
+                        }
+                        else -> Unit
+                    }
+                }
+            )
+        }
+    }
+
+    /** Called by DownloadRepository to keep IRC alive during an active XDCC transaction. */
+    fun setDownloadActive(active: Boolean) {
+        hasActiveDownload = active
+        if (!active && !isForegrounded) pauseForLifecycle()
+    }
+
+    private fun pauseForLifecycle() {
+        if (lifecyclePaused) return
+        lifecyclePaused = true
+        connectJob?.cancel()
+        client.disconnect()
+    }
+
+    private fun resumeFromLifecycle() {
+        lifecyclePaused = false
+        scope.launch {
+            val settings = settingsRepository.settings.first()
+            reconnect(settings)
+        }
     }
 
     fun sendRaw(line: String) {
@@ -60,6 +109,7 @@ class IrcRepository @Inject constructor(
     }
 
     private suspend fun reconnect(settings: AppSettings) {
+        if (lifecyclePaused) return  // resumeFromLifecycle will reconnect with fresh settings
         val wasRunning = connectJob?.isActive == true
         connectJob?.cancel()
         connectJob?.join()
