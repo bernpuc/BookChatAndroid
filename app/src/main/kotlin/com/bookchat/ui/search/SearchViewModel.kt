@@ -54,7 +54,7 @@ class SearchViewModel @Inject constructor(
     fun onDownload(result: SearchResult) {
         downloadRepository.enqueue(
             DownloadItem(
-                botName = result.downloadCommand, // already "!botName fileHash"
+                downloadCommand = result.downloadCommand,
                 fileHash = result.fileHash,
                 expectedFileName = result.fileName,
                 displayTitle = result.title.ifBlank { result.fileName },

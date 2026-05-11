@@ -4,7 +4,7 @@ import java.util.UUID
 
 data class DownloadItem(
     val id: UUID = UUID.randomUUID(),
-    val botName: String,
+    val downloadCommand: String,
     val fileHash: String,
     val expectedFileName: String,
     val displayTitle: String,

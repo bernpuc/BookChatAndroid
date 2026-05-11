@@ -93,7 +93,7 @@ class DownloadRepository @Inject constructor(
         val channel = settingsRepository.settings.first().ircChannel
         _queue.value = _queue.value.drop(1)
         _activeDownload.value = next.copy(state = DownloadItemState.RequestSent)
-        ircRepository.sendRaw("PRIVMSG $channel :${next.botName}")
+        ircRepository.sendRaw("PRIVMSG $channel :${next.downloadCommand}")
         searchRepository.updateResultState(next.expectedFileName, DownloadState.Requesting)
     }
 
@@ -182,7 +182,7 @@ class DownloadRepository @Inject constructor(
                         userEventBus.snackbar("⚠ Drive upload failed — book saved to Downloads/BookChat")
                     }
                     // Record bot outcome for future ranking
-                    val botName = item.botName.substringBefore(" ").removePrefix("!")
+                    val botName = item.downloadCommand.substringBefore(" ").removePrefix("!")
                     if (terminalState is DownloadItemState.Done || terminalState is DownloadItemState.SavedLocally) {
                         val avgSpeed = speedWindow.let { w ->
                             if (w.size < 2) 0L
@@ -202,7 +202,7 @@ class DownloadRepository @Inject constructor(
                         val msg = e.message ?: "Download failed"
                         moveToCompleted(item.copy(state = DownloadItemState.Failed(msg)))
                         searchRepository.updateResultState(item.expectedFileName, DownloadState.Failed(msg))
-                        val botName = item.botName.substringBefore(" ").removePrefix("!")
+                        val botName = item.downloadCommand.substringBefore(" ").removePrefix("!")
                         botStatsRepository.recordFailure(botName)
                     }
                 },
