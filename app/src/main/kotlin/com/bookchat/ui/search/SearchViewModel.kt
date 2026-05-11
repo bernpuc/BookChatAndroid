@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val MAX_DIAGNOSTICS_ENTRIES = 75
+
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val ircRepository: IrcRepository,
@@ -42,6 +44,39 @@ class SearchViewModel @Inject constructor(
 
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
+
+    private val _diagnosticsExpanded = MutableStateFlow(false)
+    val diagnosticsExpanded: StateFlow<Boolean> = _diagnosticsExpanded.asStateFlow()
+
+    private val _diagnosticsEntries = MutableStateFlow<List<DiagnosticsEntry>>(emptyList())
+    val diagnosticsEntries: StateFlow<List<DiagnosticsEntry>> = _diagnosticsEntries.asStateFlow()
+
+    @Volatile private var currentNick = ""
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.settings.collect { currentNick = it.ircNickname }
+        }
+        viewModelScope.launch {
+            ircRepository.inboundLines.collect { line ->
+                val nick = currentNick
+                if (nick.isNotBlank() && line.contains(nick, ignoreCase = true)) {
+                    addDiagnosticsEntry(DiagnosticsEntry(DiagnosticsDirection.In, line))
+                }
+            }
+        }
+        viewModelScope.launch {
+            ircRepository.sentLines.collect { line ->
+                addDiagnosticsEntry(DiagnosticsEntry(DiagnosticsDirection.Out, line))
+            }
+        }
+    }
+
+    fun toggleDiagnostics() { _diagnosticsExpanded.value = !_diagnosticsExpanded.value }
+
+    private fun addDiagnosticsEntry(entry: DiagnosticsEntry) {
+        _diagnosticsEntries.value = (_diagnosticsEntries.value + entry).takeLast(MAX_DIAGNOSTICS_ENTRIES)
+    }
 
     fun onSearchTextChange(text: String) { _searchText.value = text }
 

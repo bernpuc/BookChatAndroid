@@ -241,7 +241,7 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("Version") },
                     trailingContent = {
-                        Text("1.0.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("1.1.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                 )
             }

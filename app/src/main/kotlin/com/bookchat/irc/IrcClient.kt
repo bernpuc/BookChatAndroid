@@ -32,11 +32,15 @@ class IrcClient {
     private val _inboundLines = MutableSharedFlow<String>(extraBufferCapacity = 64)
     val inboundLines = _inboundLines.asSharedFlow()
 
+    private val _sentLines = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val sentLines = _sentLines.asSharedFlow()
+
     @Volatile private var writer: PrintWriter? = null
     @Volatile private var socket: Socket? = null
 
     fun sendRaw(line: String) {
         writer?.println(line)
+        _sentLines.tryEmit(line)
     }
 
     // Runs forever — caller cancels the coroutine to stop.

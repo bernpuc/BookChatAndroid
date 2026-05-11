@@ -30,6 +30,7 @@ class IrcRepository @Inject constructor(
 
     val connectionState: StateFlow<IrcConnectionState> = client.connectionState
     val inboundLines: SharedFlow<String> = client.inboundLines
+    val sentLines: SharedFlow<String> = client.sentLines
 
     // Kept for legacy collectors; UserEventBus is now the canonical channel
     private val _reconnectEvent = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
