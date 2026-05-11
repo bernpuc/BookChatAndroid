@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -96,8 +95,6 @@ private fun DiagnosticsEntryRow(entry: DiagnosticsEntry) {
         text = "$arrow ${entry.time} ${entry.text}",
         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         color = color,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(vertical = 2.dp),
     )
 }
